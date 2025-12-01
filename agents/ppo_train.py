@@ -22,52 +22,6 @@ def make_env(seed=None):
 
 
 # -------------------------------
-#   EVALUATION (RAW ENV)
-# -------------------------------
-def evaluate_model(model, episodes=10):
-    metrics = {
-        "total_ore": [],
-        "energy_used": [],
-        "exploration_rate": [],
-        "max_floor": [],
-    }
-
-    for ep in range(episodes):
-        env = make_env(seed=ep)
-        obs, info = env.reset()
-
-        done = False
-        total_ore = 0
-        starting_energy = float(obs["energy"][0])
-        visited_tiles = set()
-        max_floor_reached = 0
-
-        while not done:
-            action, _ = model.predict(obs, deterministic=True)
-            obs, reward, terminated, truncated, info = env.step(action)
-            done = terminated or truncated
-
-            # Track ORE
-            if info.get("last_mined_tile_type") == "ore":
-                total_ore += 1
-
-            # Track visited tiles
-            x = info["agent_x"]
-            y = info["agent_y"]
-            visited_tiles.add((x, y))
-
-            # Track floor progression
-            max_floor_reached = max(max_floor_reached, info["floor"])
-
-        metrics["total_ore"].append(total_ore)
-        metrics["energy_used"].append(starting_energy - float(obs["energy"][0]))
-        metrics["exploration_rate"].append(len(visited_tiles) / (env.SIZE ** 2))
-        metrics["max_floor"].append(max_floor_reached)
-
-    return metrics
-
-
-# -------------------------------
 #   MAIN TRAINING LOOP
 # -------------------------------
 def main():
@@ -92,19 +46,6 @@ def main():
     model.save("ppo_stardew_mine_full.zip")
     print("✅ Model trained!")
     print("Saved as ppo_stardew_mine_full.zip")
-
-    # -------------------
-    # EVALUATE
-    # -------------------
-    print("\nRunning evaluation...")
-    eval_metrics = evaluate_model(model, episodes=10)
-
-    print("\n=== Evaluation Results ===")
-    print(f"Average Ore Collected:      {np.mean(eval_metrics['total_ore']):.2f}")
-    print(f"Average Energy Used:        {np.mean(eval_metrics['energy_used']):.2f}")
-    print(f"Average Exploration Rate:   {np.mean(eval_metrics['exploration_rate']):.2f}")
-    print(f"Average Max Floor Reached:  {np.mean(eval_metrics['max_floor']):.2f}")
-
 
 if __name__ == "__main__":
     main()
