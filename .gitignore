@@ -1,0 +1,32 @@
+# Byte-compiled / caches
+__pycache__/
+*.py[cod]
+env/*.pyc
+*.pyc
+
+# macOS
+.DS_Store
+
+# Python virtual envs
+.env/
+venv/
+.envs/
+.venv/
+
+# Jupyter
+.ipynb_checkpoints/
+*.ipynb
+
+# Editor/IDE
+.vscode/
+.idea/
+
+# Models, results, large artifacts
+models/
+results/
+*.zip
+*.mp4
+
+# Logs and misc
+*.log
+agents/logs/
