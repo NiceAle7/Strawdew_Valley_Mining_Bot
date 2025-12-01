@@ -8,7 +8,7 @@ try:
     from gymnasium.wrappers import FlattenObservation
 except Exception:
     from gym.wrappers import FlattenObservation
-from env.stardew_mine_env import StardewMineEnv
+from env.stardew_mine_env_weeds import StardewMineEnv
 
 MODEL = os.path.join(ROOT, 'models', 'ppo_moderate_ore_dense_100000_20251130_214525.zip')
 

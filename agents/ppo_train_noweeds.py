@@ -8,8 +8,12 @@ from stable_baselines3.common.vec_env import DummyVecEnv
 # Add the project root to sys.path
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from env.stardew_mine_env import StardewMineEnv
+from env.stardew_mine_env_noweeds import StardewMineEnv
 from env.reward_functions import compute_reward  # <-- fix here
+from stable_baselines3.common.monitor import Monitor
+
+LOG_DIR = "logs"
+os.makedirs(LOG_DIR, exist_ok=True)
 
 
 
@@ -18,6 +22,7 @@ from env.reward_functions import compute_reward  # <-- fix here
 # -------------------------------
 def make_env(seed=None):
     env = StardewMineEnv(size=10, seed=seed)
+    env = Monitor(env, LOG_DIR)  
     return env
 
 
