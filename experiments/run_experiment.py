@@ -132,7 +132,7 @@ def run_training(config_name, params, timesteps, move_cost, size, seed, eval_epi
     except Exception:
         from gym.wrappers import FlattenObservation
 
-    from env.stardew_mine_env import StardewMineEnv
+    from env.stardew_mine_env_weeds import StardewMineEnv
 
     def make_env():
         return FlattenObservation(StardewMineEnv(size=size, seed=seed, move_cost=move_cost, ladder_near_prob=args.ladder_near_prob))
