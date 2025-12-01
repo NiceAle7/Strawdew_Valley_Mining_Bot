@@ -18,6 +18,8 @@ class StardewMineEnv(gym.Env):
         local_view_size: int = 5,
         move_cost: float = 0.0,
         seed: Optional[int] = None,
+        \
+        spawn_weed: bool = False
     ):
 
         # Grid config
@@ -44,11 +46,14 @@ class StardewMineEnv(gym.Env):
         # Tile types
         self.EMPTY = 0
         self.LADDER = 1
-        self.WEED = 2
-        self.ROCK = 3
-        self.ORE = 4
+        self.ROCK = 2
+        self.ORE = 3
         self.OUT_OF_BOUND = -1
-        self.MAX_TILE_TYPE = 4
+        if spawn_weed:
+            self.WEED = 4
+            self.MAX_TILE_TYPE = 4
+        else:
+            self.MAX_TILE_TYPE = 3
         self.AGENT = 9
 
         # Actions
