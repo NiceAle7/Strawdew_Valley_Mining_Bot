@@ -70,9 +70,9 @@ class StardewMineEnv(gym.Env):
         # Observation space
         self.observation_space = gym.spaces.Dict({
             'agent_location': gym.spaces.Box(low=0, high=self.SIZE - 1, shape=(2,), dtype=np.int32),
-            'energy': gym.spaces.Box(low=0, high=self.MAX_ENERGY, shape=(), dtype=np.int32),
-            'floor': gym.spaces.Box(low=0, high=self.MAX_FLOOR - 1, shape=(), dtype=np.int32),
-            'local_view': gym.spaces.Box(low=self.OUT_OF_BOUND, high=self.MAX_TILE_TYPE, shape=(self.LOCAL_VIEW_SIZE, self.LOCAL_VIEW_SIZE), dtype=np.int32),
+            'energy': gym.spaces.Box(low=0, high=self.MAX_ENERGY, shape=(1,), dtype=np.int32),
+            'floor': gym.spaces.Box(low=0, high=self.MAX_FLOOR - 1, shape=(1,), dtype=np.int32),
+            'local_view': gym.spaces.Box(low=self.OUT_OF_BOUND, high=self.MAX_TILE_TYPE, shape=(self.LOCAL_VIEW_SIZE, self.LOCAL_VIEW_SIZE), dtype=np.float32),
         })
 
         # Seed RNG (use gym's seeding API on reset)
@@ -193,26 +193,37 @@ class StardewMineEnv(gym.Env):
         half = self.LOCAL_VIEW_SIZE // 2
         ax = int(self.agent_location[0])
         ay = int(self.agent_location[1])
+
         x0 = ax - half
         y0 = ay - half
         x1 = ax + half + 1
         y1 = ay + half + 1
-        local_view = np.full((self.LOCAL_VIEW_SIZE, self.LOCAL_VIEW_SIZE), self.OUT_OF_BOUND, dtype=np.int32)
+
+        local_view = np.full(
+            (self.LOCAL_VIEW_SIZE, self.LOCAL_VIEW_SIZE),
+            self.OUT_OF_BOUND,
+            dtype=np.float32,
+        )
+
         gx0 = max(0, x0)
         gy0 = max(0, y0)
         gx1 = min(self.SIZE, x1)
         gy1 = min(self.SIZE, y1)
-        patch = self.grid[gy0:gy1, gx0:gx1]
+
+        patch = self.grid[gy0:gy1, gx0:gx1].astype(np.float32)
+
         px0 = gx0 - x0
         py0 = gy0 - y0
         local_view[py0:py0 + patch.shape[0], px0:px0 + patch.shape[1]] = patch
+
         obs = {
-            'agent_location': self.agent_location.copy(),
-            'energy': np.int32(self.energy),
-            'floor': np.int32(self.floor),
+            'agent_location': self.agent_location.astype(np.float32),
+            'energy': np.array([self.energy], dtype=np.float32),  # shape (1,)
+            'floor': np.array([self.floor], dtype=np.float32),    # shape (1,)
             'local_view': local_view,
         }
         return obs
+
 
     def _get_info(self):
         return {}
