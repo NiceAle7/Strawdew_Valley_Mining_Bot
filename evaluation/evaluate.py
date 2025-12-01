@@ -20,8 +20,7 @@ def make_env(seed=0):
 # ------------------------------
 # EVALUATION LOGIC
 # ------------------------------
-def evaluate_model(model, env, episodes=5):
-
+def evaluate_model(model, episodes=10):
     metrics = {
         "total_ore": [],
         "energy_used": [],
@@ -29,62 +28,36 @@ def evaluate_model(model, env, episodes=5):
         "max_floor": [],
     }
 
-    is_vec = hasattr(env, "envs")
-
     for ep in range(episodes):
+        env = make_env(seed=ep)
         obs, info = env.reset()
 
-        total_ore = 0
-        visited = set()
-        max_floor_reached = 0
-
-        starting_energy = float(obs["energy"][0]) if is_vec else float(obs["energy"][0])
-
         done = False
-        step_count = 0
+        total_ore = 0
+        starting_energy = float(obs["energy"][0])
+        visited_tiles = set()
+        max_floor_reached = 0
 
         while not done:
             action, _ = model.predict(obs, deterministic=True)
-            obs, reward, terminated, truncated, infos = env.step(action)
+            obs, reward, terminated, truncated, info = env.step(action)
+            done = terminated or truncated
 
-            done = bool(terminated[0]) if is_vec else bool(terminated)
-
-            info0 = infos[0] if is_vec else infos
-
-            # -----------------------
-            # Count ore mined
-            # -----------------------
-            if info0.get("last_mined_tile_type") == "ore":
+            # Track ORE
+            if info.get("last_mined_tile_type") == "ore":
                 total_ore += 1
 
-            # -----------------------
-            # Agent location tracking
-            # -----------------------
-            agent_loc = obs["agent_location"][0] if is_vec else obs["agent_location"]
-            ax, ay = int(agent_loc[0]), int(agent_loc[1])
-            visited.add((ax, ay))
+            # Track visited tiles
+            x = info["agent_x"]
+            y = info["agent_y"]
+            visited_tiles.add((x, y))
 
-            # -----------------------
-            # Floor tracking
-            # -----------------------
-            floor_val = int(obs["floor"][0]) if is_vec else int(obs["floor"])
-            max_floor_reached = max(max_floor_reached, floor_val)
-
-            print(f"EP {ep+1} STEP {step_count}: "
-                  f"Loc=({ax},{ay}) Floor={floor_val}")
-
-            step_count += 1
-
-        # -----------------------
-        # Final episode stats
-        # -----------------------
-        remaining_energy = float(obs["energy"][0])
-
-        grid_size = env.envs[0].SIZE if is_vec else env.SIZE
+            # Track floor progression
+            max_floor_reached = max(max_floor_reached, info["floor"])
 
         metrics["total_ore"].append(total_ore)
-        metrics["energy_used"].append(starting_energy - remaining_energy)
-        metrics["exploration_rate"].append(len(visited) / (grid_size ** 2))
+        metrics["energy_used"].append(starting_energy - float(obs["energy"][0]))
+        metrics["exploration_rate"].append(len(visited_tiles) / (env.SIZE ** 2))
         metrics["max_floor"].append(max_floor_reached)
 
     return metrics
@@ -102,7 +75,7 @@ def main():
     )
     model = PPO.load(model_path, env=env)
 
-    metrics = evaluate_model(model, env, episodes=5)
+    metrics = evaluate_model(model, episodes=5)
 
     print("\n=== Evaluation Metrics ===")
     print(f"Avg Ore Collected:      {np.mean(metrics['total_ore']):.2f}")
