@@ -18,7 +18,6 @@ class StardewMineEnv(gym.Env):
         local_view_size: int = 5,
         move_cost: float = 0.0,
         seed: Optional[int] = None,
-        \
         spawn_weed: bool = False,
     ):
 
