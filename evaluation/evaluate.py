@@ -93,7 +93,7 @@ def main():
     models_dir = os.path.join(repo_root, "models")
 
     # Look for common model filenames in models/ and repo root
-    names = ["ppo_mine_no_weeds", "ppo_mine_no_weeds.zip", "ppo_stardew_mine_full", "ppo_stardew_mine_full.zip"]
+    names = ["ppo_mine_no_weeds", "ppo_mine_no_weeds.zip", "ppo_mine_weeds", "ppo_mine_weeds.zip", "ppo_stardew_mine_full", "ppo_stardew_mine_full.zip"]
     for name in names:
         candidates.append(os.path.join(models_dir, name))
         candidates.append(os.path.join(repo_root, name))
@@ -110,11 +110,20 @@ def main():
         raise FileNotFoundError(f"No model file found. Checked: {candidates}")
 
     print(f"Using model file: {model_path}")
-    model = PPO.load(model_path, env=env)
-
-    # Infer use_weeds from model filename
+    
+    # Infer use_weeds from model filename BEFORE loading
     model_basename = os.path.basename(model_path).lower()
-    use_weeds = "no_weeds" not in model_basename
+    if "no_weeds" in model_basename:
+        use_weeds = False
+    elif "weeds" in model_basename:
+        use_weeds = True
+    else:
+        # Default to True for unknown models
+        use_weeds = True
+    
+    # Recreate env with correct weed setting before loading model
+    env = DummyVecEnv([lambda: make_env(0, use_weeds=use_weeds)])
+    model = PPO.load(model_path, env=env)
 
     metrics = evaluate_model(model, episodes=5, use_weeds=use_weeds)
 
