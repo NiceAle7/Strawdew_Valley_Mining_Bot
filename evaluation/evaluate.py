@@ -8,21 +8,24 @@ from stable_baselines3.common.vec_env import DummyVecEnv
 
 # Add project root to import env
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-from env.stardew_mine_env_weeds import StardewMineEnv_Weeds
+from env.stardew_mine_env import StardewMineEnv
 
 
 # ------------------------------
 # ENV FACTORY
 # ------------------------------
-def make_env(seed=0):
-    return StardewMineEnv_Weeds(size=10, seed=seed)
+def make_env(seed=0, use_weeds=True) -> StardewMineEnv:
+    return StardewMineEnv(size=10, seed=seed, spawn_weed=use_weeds)
 
 
 # ------------------------------
 # EVALUATION LOGIC
 # ------------------------------
-def evaluate_model(model, episodes=10):
+def evaluate_model(model, episodes=10, use_weeds=True):
 
+    # Ore types in the environment
+    ore_types = {"copper", "iron", "gold", "magma", "mystic_stone"}
+    
     metrics = {
         "total_ore": [],
         "energy_used": [],
@@ -32,7 +35,7 @@ def evaluate_model(model, episodes=10):
 
     for ep in range(episodes):
 
-        env = make_env(seed=ep)
+        env = make_env(seed=ep, use_weeds=use_weeds)
         obs, info = env.reset()
 
         done = False
@@ -47,8 +50,8 @@ def evaluate_model(model, episodes=10):
             obs, reward, terminated, truncated, info = env.step(action)
             done = terminated or truncated
 
-            # Track mined ore
-            if info.get("last_mined_tile_type") == "ore":
+            # Track mined ore (count all ore types)
+            if info.get("last_mined_tile_type") in ore_types:
                 total_ore += 1
 
             # Track visited tiles
@@ -79,12 +82,41 @@ def main():
 
     env = DummyVecEnv([lambda: make_env(0)])
 
-    model_path = os.path.join(
-        os.path.dirname(__file__), "../ppo_stardew_mine_full.zip"
-    )
+    # Allow override via env var or CLI arg
+    override = os.environ.get("MODEL_PATH") or (sys.argv[1] if len(sys.argv) > 1 else None)
+
+    candidates = []
+    if override:
+        candidates.append(os.path.abspath(override))
+
+    repo_root = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
+    models_dir = os.path.join(repo_root, "models")
+
+    # Look for common model filenames in models/ and repo root
+    names = ["ppo_mine_no_weeds", "ppo_mine_no_weeds.zip", "ppo_stardew_mine_full", "ppo_stardew_mine_full.zip"]
+    for name in names:
+        candidates.append(os.path.join(models_dir, name))
+        candidates.append(os.path.join(repo_root, name))
+
+    candidates = [os.path.abspath(p) for p in candidates]
+
+    model_path = None
+    for p in candidates:
+        if os.path.exists(p):
+            model_path = p
+            break
+
+    if model_path is None:
+        raise FileNotFoundError(f"No model file found. Checked: {candidates}")
+
+    print(f"Using model file: {model_path}")
     model = PPO.load(model_path, env=env)
 
-    metrics = evaluate_model(model, episodes=5)
+    # Infer use_weeds from model filename
+    model_basename = os.path.basename(model_path).lower()
+    use_weeds = "no_weeds" not in model_basename
+
+    metrics = evaluate_model(model, episodes=5, use_weeds=use_weeds)
 
     print("\n=== Evaluation Metrics ===")
     print(f"Avg Ore Collected:      {np.mean(metrics['total_ore']):.2f}")

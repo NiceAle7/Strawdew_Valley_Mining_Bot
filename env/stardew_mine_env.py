@@ -5,8 +5,10 @@ import gymnasium as gym
 from reward_functions import compute_reward
 
 
-class StardewMineEnv_NoWeeds(gym.Env):
-    """Grid-based mining environment with NO weeds."""
+class StardewMineEnv(gym.Env):
+    """
+    Grid-based mining environment with optional weed obstacles.
+    """
 
     def __init__(
         self,
@@ -16,14 +18,16 @@ class StardewMineEnv_NoWeeds(gym.Env):
         local_view_size: int = 5,
         move_cost: float = 0.0,
         seed: Optional[int] = None,
+        spawn_weed: bool = False,
     ):
 
-        # Grid config
+        # Config
         self.SIZE = size
         self.MAX_FLOOR = max_floor
         self.MAX_ENERGY = max_energy
         self.LOCAL_VIEW_SIZE = local_view_size
         self.MOVE_COST = float(move_cost)
+        self.SPAWN_WEED = bool(spawn_weed)
 
         # State
         self.agent_location = np.array([0, 0], dtype=np.int32)
@@ -37,18 +41,50 @@ class StardewMineEnv_NoWeeds(gym.Env):
         self.max_steps = 500
         self.current_step = 0
 
-        # Tile types (NO WEEDS)
+        # Tile types
         self.EMPTY = 0
         self.LADDER = 1
         self.ROCK = 2
-        self.ORE = 3
-        self.MAX_TILE_TYPE = 3
+        self.COPPER = 3
+        self.IRON = 4
+        self.GOLD = 5
+        self.MAGMA = 6
+        self.MYSTIC = 7
+        # Optional weeds: when spawn_weed is True, enable WEED tile type
+        if spawn_weed:
+            self.WEED = 8
+            self.MAX_TILE_TYPE = 8
+        else:
+            self.MAX_TILE_TYPE = 7
         self.OUT_OF_BOUND = -1
         self.AGENT = 9
 
         self.action_space = gym.spaces.Discrete(17)
 
-        # Direction vectors
+        # Movement
+        self.ACTION_MOVE_RIGHT = 0
+        self.ACTION_MOVE_UP_RIGHT = 1
+        self.ACTION_MOVE_UP = 2
+        self.ACTION_MOVE_UP_LEFT = 3
+        self.ACTION_MOVE_LEFT = 4
+        self.ACTION_MOVE_DOWN_LEFT = 5
+        self.ACTION_MOVE_DOWN = 6
+        self.ACTION_MOVE_DOWN_RIGHT = 7
+
+        # Mining
+        self.ACTION_MINE_RIGHT = 8
+        self.ACTION_MINE_UP_RIGHT = 9
+        self.ACTION_MINE_UP = 10
+        self.ACTION_MINE_UP_LEFT = 11
+        self.ACTION_MINE_LEFT = 12
+        self.ACTION_MINE_DOWN_LEFT = 13
+        self.ACTION_MINE_DOWN = 14
+        self.ACTION_MINE_DOWN_RIGHT = 15
+
+        # Descend
+        self.ACTION_DESCEND = 16
+
+        # Movement vectors
         self._action_to_direction = {
             0: np.array([1, 0]),
             1: np.array([1, -1]),
@@ -59,27 +95,6 @@ class StardewMineEnv_NoWeeds(gym.Env):
             6: np.array([0, 1]),
             7: np.array([1, 1]),
         }
-
-        # Movement and mining constants
-        self.ACTION_MOVE_RIGHT = 0
-        self.ACTION_MOVE_UP_RIGHT = 1
-        self.ACTION_MOVE_UP = 2
-        self.ACTION_MOVE_UP_LEFT = 3
-        self.ACTION_MOVE_LEFT = 4
-        self.ACTION_MOVE_DOWN_LEFT = 5
-        self.ACTION_MOVE_DOWN = 6
-        self.ACTION_MOVE_DOWN_RIGHT = 7
-
-        self.ACTION_MINE_RIGHT = 8
-        self.ACTION_MINE_UP_RIGHT = 9
-        self.ACTION_MINE_UP = 10
-        self.ACTION_MINE_UP_LEFT = 11
-        self.ACTION_MINE_LEFT = 12
-        self.ACTION_MINE_DOWN_LEFT = 13
-        self.ACTION_MINE_DOWN = 14
-        self.ACTION_MINE_DOWN_RIGHT = 15
-
-        self.ACTION_DESCEND = 16
 
         # Observation space
         self.observation_space = gym.spaces.Dict(
@@ -146,7 +161,7 @@ class StardewMineEnv_NoWeeds(gym.Env):
             self.visited[new_y, new_x] = True
             self.agent_location = np.array([new_x, new_y])
 
-            if self.MOVE_COST != 0:
+            if self.MOVE_COST != 0.0:
                 self.energy = max(0, self.energy - self.MOVE_COST)
 
         # Mining
@@ -181,14 +196,14 @@ class StardewMineEnv_NoWeeds(gym.Env):
             tile_type = self._get_tile_type()
 
         reward = compute_reward(
-            tile_type,
-            self._action_name(action),
-            bool(has_visited_before),
-            prev_energy,
-            self.energy,
-            prev_floor,
-            self.floor,
-            include_weeds=False,
+            tile_type=tile_type,
+            action=self._action_name(action),
+            has_visited_before=bool(has_visited_before),
+            previous_energy=prev_energy,
+            current_energy=self.energy,
+            previous_floor=prev_floor,
+            current_floor=self.floor,
+            include_weeds=self.SPAWN_WEED,
         )
 
         return self._get_obs(), reward, terminated, truncated, self._get_info()
@@ -227,51 +242,122 @@ class StardewMineEnv_NoWeeds(gym.Env):
         self.last_mined_tile = None
 
     def _generate_floor(self):
-        self.grid = np.full((self.SIZE, self.SIZE), self.EMPTY)
+        self.grid = np.full((self.SIZE, self.SIZE), self.EMPTY, dtype=np.int32)
+
+        # Increase ore density for training experiments to make mining more
+        # learnable. Lower rock probability slightly and reduce weeds.
+        
+        probs = self._get_floor_spawn_probs(self.floor)
+        p_rock   = probs["rock"]
+        p_copper = probs["copper"]
+        p_iron   = probs["iron"]
+        p_gold   = probs["gold"]
+        p_magma  = probs["magma"]
+        p_mystic = probs["mystic"]
+
+        p_weed = 0.05 if hasattr(self, "WEED") else 0.0
+
+
         possible = []
-
-        prob_rock = 0.30
-        prob_ore = 0.15
-
-        ax, ay = self.agent_location
+        ax, ay = int(self.agent_location[0]), int(self.agent_location[1])
 
         for y in range(self.SIZE):
             for x in range(self.SIZE):
                 if (x, y) == (ax, ay):
                     continue
+
                 r = self.np_random.random()
-                if r < prob_rock:
+
+                # weeds first if enabled
+                if hasattr(self, "WEED") and r < p_weed:
+                    self.grid[y, x] = self.WEED
+
+                # Ores & rocks (in cumulative order)
+                elif r < p_weed + p_rock:
                     self.grid[y, x] = self.ROCK
                     possible.append((x, y))
-                elif r < prob_rock + prob_ore:
-                    self.grid[y, x] = self.ORE
+                elif r < p_weed + p_rock + p_copper:
+                    self.grid[y, x] = self.COPPER
                     possible.append((x, y))
+                elif r < p_weed + p_rock + p_copper + p_iron:
+                    self.grid[y, x] = self.IRON
+                    possible.append((x, y))
+                elif r < p_weed + p_rock + p_copper + p_iron + p_gold:
+                    self.grid[y, x] = self.GOLD
+                    possible.append((x, y))
+                elif r < p_weed + p_rock + p_copper + p_iron + p_gold + p_magma:
+                    self.grid[y, x] = self.MAGMA
+                    possible.append((x, y))
+                elif r < p_weed + p_rock + p_copper + p_iron + p_gold + p_magma + p_mystic:
+                    self.grid[y, x] = self.MYSTIC
+                    possible.append((x, y))
+                # else EMPTY
 
+        # Ensure at least 1 ore/rock tile for ladder placement
         if not possible:
             x = int(self.np_random.integers(0, self.SIZE))
             y = int(self.np_random.integers(0, self.SIZE))
-            self.grid[y, x] = self.ROCK
-            possible.append((x, y))
+            if (x, y) != (ax, ay):
+                self.grid[y, x] = self.ROCK
+                possible.append((x, y))
 
-        if self.floor < self.MAX_FLOOR - 1:
+        # Place ladder
+        if self.floor < self.MAX_FLOOR - 1 and possible:
             lx, ly = possible[int(self.np_random.integers(0, len(possible)))]
             self._ladder_location = (lx, ly)
             self.grid[ly, lx] = self.LADDER
         else:
             self._ladder_location = None
 
+
+    def _get_floor_spawn_probs(self, floor: int) -> dict:
+        if floor <= 1:
+            return dict(rock=0.30, copper=0.08, iron=0.00, gold=0.00, magma=0.00, mystic=0.00)
+        elif floor <= 3:
+            return dict(rock=0.25, copper=0.12, iron=0.00, gold=0.00, magma=0.00, mystic=0.00)
+        elif floor <= 5:
+            return dict(rock=0.20, copper=0.10, iron=0.10, gold=0.00, magma=0.00, mystic=0.00)
+        elif floor <= 7:
+            return dict(rock=0.15, copper=0.08, iron=0.12, gold=0.05, magma=0.02, mystic=0.00)
+        else:  # floors 8-9
+            return dict(rock=0.10, copper=0.06, iron=0.12, gold=0.08, magma=0.04, mystic=0.02)
+        
+
     def _is_grid_empty(self):
-        return not np.any((
-            self.grid == self.ROCK) | (self.grid == self.ORE)
+        mineables = (
+            (self.grid == self.ROCK)
+            | (self.grid == self.COPPER)
+            | (self.grid == self.IRON)
+            | (self.grid == self.GOLD)
+            | (self.grid == self.MAGMA)
+            | (self.grid == self.MYSTIC)
         )
+        if hasattr(self, "WEED"):
+            mineables |= (self.grid == self.WEED)
+        return not np.any(mineables)
 
     def _map_tile_int_to_str(self, v):
-        mapping = {self.EMPTY: "empty", self.ROCK: "rock", self.ORE: "ore", self.LADDER: "ladder"}
+        mapping = {
+            self.EMPTY: "empty",
+            self.ROCK: "rock",
+            self.COPPER: "copper",
+            self.IRON: "iron",
+            self.GOLD: "gold",
+            self.MAGMA: "magma",
+            self.MYSTIC: "mystic_stone",
+            self.LADDER: "ladder",
+        }
+        if hasattr(self, "WEED"):
+            mapping[self.WEED] = "weeds"
         return mapping.get(v, "unknown")
 
     def _get_tile_type(self):
-        x, y = self.agent_location
-        return self._map_tile_int_to_str(int(self.grid[y, x]))
+        x, y = int(self.agent_location[0]), int(self.agent_location[1])
+        if 0 <= x < self.SIZE and 0 <= y < self.SIZE:
+            tile = int(self.grid[y, x])
+            return self._map_tile_int_to_str(tile)
+        return "unknown"
+
 
     def _action_name(self, action):
         if action == self.ACTION_DESCEND:
@@ -299,7 +385,7 @@ class StardewMineEnv_NoWeeds(gym.Env):
         patch = self.grid[gy0:gy1, gx0:gx1].astype(float)
         px0, py0 = gx0 - x0, gy0 - y0
 
-        local_view[py0:py0+patch.shape[0], px0:px0+patch.shape[1]] = patch  # <-- UNITY FIX
+        local_view[py0:py0+patch.shape[0], px0:px0+patch.shape[1]] = patch
         local_view = np.expand_dims(local_view, axis=-1)
 
         return {
@@ -331,3 +417,18 @@ class StardewMineEnv_NoWeeds(gym.Env):
         g[y, x] = self.AGENT
         print("Floor:", self.floor, "Energy:", self.energy)
         print(g)
+
+
+# Backwards-compatible wrapper classes
+class StardewMineEnv_NoWeeds(StardewMineEnv):
+    def __init__(self, *args, **kwargs):
+        kwargs.setdefault('spawn_weed', False)
+        super().__init__(*args, **kwargs)
+
+
+class StardewMineEnv_Weeds(StardewMineEnv):
+    def __init__(self, *args, **kwargs):
+        kwargs.setdefault('spawn_weed', True)
+        # ensure WEED attribute exists for internal code that references it
+        self.WEED = 4
+        super().__init__(*args, **kwargs)
