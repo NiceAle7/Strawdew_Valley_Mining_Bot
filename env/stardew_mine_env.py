@@ -14,7 +14,7 @@ class StardewMineEnv(gym.Env):
         self,
         size: int = 10,
         max_floor: int = 10,
-        max_energy: int = 100,
+        max_energy: int = 500,
         local_view_size: int = 5,
         move_cost: float = 0.0,
         seed: Optional[int] = None,
