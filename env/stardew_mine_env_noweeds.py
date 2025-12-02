@@ -4,6 +4,8 @@ import gymnasium as gym
 
 from reward_functions import compute_reward
 
+# NOTE: Temporary test comment to verify git commit flow.
+
 
 class StardewMineEnv_NoWeeds(gym.Env):
     """Grid-based mining environment with NO weeds."""
