@@ -16,8 +16,6 @@ class StardewMineEnv_Weeds(gym.Env):
         local_view_size: int = 5,
         move_cost: float = 0.0,
         seed: Optional[int] = None,
-        \
-        spawn_weed: bool = False
     ):
 
         # Grid config
@@ -44,13 +42,9 @@ class StardewMineEnv_Weeds(gym.Env):
         self.LADDER = 1
         self.ROCK = 2
         self.ORE = 3
+        self.WEED = 4
+        self.MAX_TILE_TYPE = 4
         self.OUT_OF_BOUND = -1
-        # Optional weeds: when spawn_weed is True, enable WEED tile type
-        if spawn_weed:
-            self.WEED = 4
-            self.MAX_TILE_TYPE = 4
-        else:
-            self.MAX_TILE_TYPE = 3
         self.AGENT = 9
 
         self.action_space = gym.spaces.Discrete(17)
