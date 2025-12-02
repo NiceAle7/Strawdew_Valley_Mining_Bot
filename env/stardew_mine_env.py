@@ -47,13 +47,17 @@ class StardewMineEnv(gym.Env):
         self.EMPTY = 0
         self.LADDER = 1
         self.ROCK = 2
-        self.ORE = 3
+        self.COPPER = 3
+        self.IRON = 4
+        self.GOLD = 5
+        self.MAGMA = 6
+        self.MYSTIC = 7
         self.OUT_OF_BOUND = -1
         if spawn_weed:
-            self.WEED = 4
-            self.MAX_TILE_TYPE = 4
+            self.WEED = 8
+            self.MAX_TILE_TYPE = 8
         else:
-            self.MAX_TILE_TYPE = 3
+            self.MAX_TILE_TYPE = 7
         self.AGENT = 9
 
         # Actions
@@ -286,9 +290,19 @@ class StardewMineEnv(gym.Env):
 
         # Increase ore density for training experiments to make mining more
         # learnable. Lower rock probability slightly and reduce weeds.
-        prob_weed, prob_rock, prob_ore = 0.05, 0.25, 0.15
-        possible = []
+        
+        probs = self._get_floor_spawn_probs(self.floor)
+        p_rock   = probs["rock"]
+        p_copper = probs["copper"]
+        p_iron   = probs["iron"]
+        p_gold   = probs["gold"]
+        p_magma  = probs["magma"]
+        p_mystic = probs["mystic"]
 
+        p_weed = 0.05 if hasattr(self, "WEED") else 0.0
+
+
+        possible = []
         ax, ay = int(self.agent_location[0]), int(self.agent_location[1])
 
         for y in range(self.SIZE):
@@ -297,35 +311,77 @@ class StardewMineEnv(gym.Env):
                     continue
 
                 r = self.np_random.random()
-                if r < prob_weed:
+
+                # weeds first if enabled
+                if hasattr(self, "WEED") and r < p_weed:
                     self.grid[y, x] = self.WEED
-                elif r < prob_weed + prob_rock:
+
+                # Ores & rocks (in cumulative order)
+                elif r < p_weed + p_rock:
                     self.grid[y, x] = self.ROCK
                     possible.append((x, y))
-                elif r < prob_weed + prob_rock + prob_ore:
-                    self.grid[y, x] = self.ORE
+                elif r < p_weed + p_rock + p_copper:
+                    self.grid[y, x] = self.COPPER
                     possible.append((x, y))
+                elif r < p_weed + p_rock + p_copper + p_iron:
+                    self.grid[y, x] = self.IRON
+                    possible.append((x, y))
+                elif r < p_weed + p_rock + p_copper + p_iron + p_gold:
+                    self.grid[y, x] = self.GOLD
+                    possible.append((x, y))
+                elif r < p_weed + p_rock + p_copper + p_iron + p_gold + p_magma:
+                    self.grid[y, x] = self.MAGMA
+                    possible.append((x, y))
+                elif r < p_weed + p_rock + p_copper + p_iron + p_gold + p_magma + p_mystic:
+                    self.grid[y, x] = self.MYSTIC_STONE
+                    possible.append((x, y))
+                # else EMPTY
 
+        # Ensure at least 1 ore/rock tile for ladder placement
         if not possible:
             x = int(self.np_random.integers(0, self.SIZE))
             y = int(self.np_random.integers(0, self.SIZE))
-            self.grid[y, x] = self.ROCK
-            possible.append((x, y))
+            if (x, y) != (ax, ay):
+                self.grid[y, x] = self.ROCK
+                possible.append((x, y))
 
-        if self.floor < self.MAX_FLOOR - 1:
+        # Place ladder
+        if self.floor < self.MAX_FLOOR - 1 and possible:
             lx, ly = possible[int(self.np_random.integers(0, len(possible)))]
             self._ladder_location = (lx, ly)
             self.grid[ly, lx] = self.LADDER
         else:
             self._ladder_location = None
 
+    
+    def _get_floor_spawn_probs(self, floor: int) -> dict:
+        if floor <= 1:
+            return dict(rock=0.30, copper=0.08, iron=0.00, gold=0.00, magma=0.00, mystic=0.00)
+        elif floor <= 3:
+            return dict(rock=0.25, copper=0.12, iron=0.00, gold=0.00, magma=0.00, mystic=0.00)
+        elif floor <= 5:
+            return dict(rock=0.20, copper=0.10, iron=0.10, gold=0.00, magma=0.00, mystic=0.00)
+        elif floor <= 7:
+            return dict(rock=0.15, copper=0.08, iron=0.12, gold=0.05, magma=0.02, mystic=0.00)
+        else:  # floors 8-9
+            return dict(rock=0.10, copper=0.06, iron=0.12, gold=0.08, magma=0.04, mystic=0.02)
+
+
     # ----------------------------------------------------------------------
     # MAPPING + CHECKS
     # ----------------------------------------------------------------------
     def _is_grid_empty(self):
-        return not np.any(
-            (self.grid == self.ROCK) | (self.grid == self.ORE) | (self.grid == self.WEED)
+        mineables = (
+            (self.grid == self.ROCK)
+            | (self.grid == self.COPPER)
+            | (self.grid == self.IRON)
+            | (self.grid == self.GOLD)
+            | (self.grid == self.MAGMA_GEODE)
+            | (self.grid == self.MYSTIC_STONE)
         )
+        if hasattr(self, "WEED"):
+            mineables |= (self.grid == self.WEED)
+        return not np.any(mineables)
 
     def _get_tile_type(self):
         """Return the string type of the tile under the agent."""
@@ -339,10 +395,15 @@ class StardewMineEnv(gym.Env):
         mapping = {
             self.EMPTY: "empty",
             self.ROCK: "rock",
-            self.ORE: "ore",
-            self.WEED: "weeds",
+            self.COPPER: "copper",
+            self.IRON: "iron",
+            self.GOLD: "gold",
+            self.MAGMA: "magma",
+            self.MYSTIC_STONE: "mystic_stone",
             self.LADDER: "ladder",
         }
+        if hasattr(self, "WEED"):
+            mapping[self.WEED] = "weeds"
         return mapping.get(tile_int, "unknown")
 
     def _action_name(self, action):
