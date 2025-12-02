@@ -8,14 +8,14 @@ from stable_baselines3.common.vec_env import DummyVecEnv
 
 # Add project root to import env
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-from env.stardew_mine_env_weeds import StardewMineEnv
+from env.stardew_mine_env_weeds import StardewMineEnv_Weeds
 
 
 # ------------------------------
 # ENV FACTORY
 # ------------------------------
 def make_env(seed=0):
-    return StardewMineEnv(size=10, seed=seed)
+    return StardewMineEnv_Weeds(size=10, seed=seed)
 
 
 # ------------------------------
