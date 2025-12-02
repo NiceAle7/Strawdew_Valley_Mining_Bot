@@ -6,7 +6,13 @@ adjust incentives by editing these values programmatically.
 
 # --- Tunable constants (edit between runs) -------------------------------
 # Primary rewards
-ORE_REWARD = 50.0
+ORE_REWARD_VALUES = {
+    "copper": 5.0,
+    "iron": 10.0,
+    "gold": 20.0,
+    "magma": 30.0,
+    "mystic_stone": 50.0,
+}
 ROCK_REWARD = 1.0
 WEED_PENALTY = 0.5
 
@@ -52,8 +58,9 @@ def compute_reward(tile_type: str, action: str, has_visited_before: bool,
             # small encouragement to try mining (bounded)
             reward += MINE_ATTEMPT_BONUS
 
-            if tile_type == "ore":
-                reward += ORE_REWARD + MINE_SUCCESS_BONUS
+            # Reward specific ore types
+            if tile_type in ORE_REWARD_VALUES:
+                reward += ORE_REWARD_VALUES[tile_type] + MINE_SUCCESS_BONUS
             elif tile_type == "rock":
                 reward += ROCK_REWARD + MINE_FAILURE_PENALTY
             elif tile_type == "weeds":
