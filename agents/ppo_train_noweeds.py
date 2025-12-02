@@ -1,38 +1,33 @@
-# ppo_train_full.py
+# ppo_train_no_weeds.py
 import sys
 import os
-import numpy as np
 from stable_baselines3 import PPO
 from stable_baselines3.common.vec_env import DummyVecEnv
 
-# Add the project root to sys.path
-sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+# Add project root to path
+project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+sys.path.append(project_root)
 
-from env.stardew_mine_env_noweeds import StardewMineEnv
-from env.reward_functions import compute_reward  # <-- fix here
-from stable_baselines3.common.monitor import Monitor
-
-LOG_DIR = "logs"
-os.makedirs(LOG_DIR, exist_ok=True)
-
+# Import NO-WEEDS environment
+from env.stardew_mine_env_noweeds import StardewMineEnv_NoWeeds
 
 
 # -------------------------------
 #   ENV CREATION
 # -------------------------------
 def make_env(seed=None):
-    env = StardewMineEnv(size=10, seed=seed)
-    env = Monitor(env, LOG_DIR)  
-    return env
+    return StardewMineEnv_NoWeeds(size=10, seed=seed)
 
 
 # -------------------------------
 #   MAIN TRAINING LOOP
 # -------------------------------
 def main():
+
     vec_env = DummyVecEnv([lambda: make_env(seed=0)])
 
-    print("Training PPO...")
+    print("Training PPO in NO-WEEDS environment...")
+
     model = PPO(
         policy="MultiInputPolicy",
         env=vec_env,
@@ -48,9 +43,14 @@ def main():
     total_timesteps = 400_000
     model.learn(total_timesteps=total_timesteps)
 
-    model.save("ppo_stardew_mine_full.zip")
-    print("✅ Model trained!")
-    print("Saved as ppo_stardew_mine_full.zip")
+    models_dir = os.path.join(project_root, "models")
+    os.makedirs(models_dir, exist_ok=True)
+    save_path = os.path.join(models_dir, "ppo_mine_no_weeds.zip")
+
+    model.save(save_path)
+    print("✅ PPO model trained in NO-WEEDS environment")
+    print(f"Saved at: {save_path}")
+
 
 if __name__ == "__main__":
     main()
