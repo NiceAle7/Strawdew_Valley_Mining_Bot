@@ -36,19 +36,19 @@ def movement_reward(action, has_visited_before):
         return 0.03 if not has_visited_before else 0.0
     return 0.0
 
-<<<<<<< HEAD
+# <<<<<<< HEAD
 
-# def energy_shaping(previous_energy, current_energy):
-#     """
-#     Penalize wasting energy.
-#     """
-#     if current_energy < previous_energy:
-#         return -0.005
-#     return 0.0
+# # def energy_shaping(previous_energy, current_energy):
+# #     """
+# #     Penalize wasting energy.
+# #     """
+# #     if current_energy < previous_energy:
+# #         return -0.005
+# #     return 0.0
 
 
-=======
->>>>>>> f6cef72 (Working project.)
+# =======
+# >>>>>>> f6cef72 (Working project.)
 def useless_action_penalty(action, tile_type):
     """
     Penalize mining nothing or junk.
