@@ -42,7 +42,7 @@ class StardewMineEnv_NoWeeds(gym.Env):
         self.LADDER = 1
         self.ROCK = 2
         self.ORE = 3
-        self.MAX_TILE_TYPE = 3
+        self.MAX_TILE_TYPE = 4
         self.OUT_OF_BOUND = -1
         self.AGENT = 9
 

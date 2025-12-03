@@ -17,7 +17,11 @@ class StardewMineEnv_Weeds(gym.Env):
         move_cost: float = 0.0,
         seed: Optional[int] = None,
         \
+<<<<<<< HEAD
         spawn_weed: bool = False
+=======
+        spawn_weed: bool = True
+>>>>>>> f6cef72 (Working project.)
     ):
 
         # Grid config
