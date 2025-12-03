@@ -36,16 +36,19 @@ def movement_reward(action, has_visited_before):
         return 0.03 if not has_visited_before else 0.0
     return 0.0
 
+# <<<<<<< HEAD
 
-# def energy_shaping(previous_energy, current_energy):
-#     """
-#     Penalize wasting energy.
-#     """
-#     if current_energy < previous_energy:
-#         return -0.005
-#     return 0.0
+# # def energy_shaping(previous_energy, current_energy):
+# #     """
+# #     Penalize wasting energy.
+# #     """
+# #     if current_energy < previous_energy:
+# #         return -0.005
+# #     return 0.0
 
 
+# =======
+# >>>>>>> f6cef72 (Working project.)
 def useless_action_penalty(action, tile_type):
     """
     Penalize mining nothing or junk.
@@ -91,7 +94,10 @@ def compute_reward(
 
     reward += exploration_reward(has_visited_before)
     reward += movement_reward(action, has_visited_before)
+<<<<<<< HEAD
     # reward += energy_shaping(previous_energy, current_energy)
+=======
+>>>>>>> f6cef72 (Working project.)
     reward += useless_action_penalty(action, tile_type)
     reward += floor_progression(current_floor, previous_floor)
 
@@ -112,4 +118,8 @@ def update_ores_collected(tile_type, action, ores_collected):
                 ores_collected[tile_type] = ores_collected.get(tile_type, 0) + 1
             else:
                 ores_collected += 1
+<<<<<<< HEAD
     return ores_collected
+=======
+    return ores_collected
+>>>>>>> f6cef72 (Working project.)
