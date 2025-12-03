@@ -18,6 +18,7 @@ class StardewMineEnv(gym.Env):
         local_view_size: int = 5,
         move_cost: float = 0.0,
         seed: Optional[int] = None,
+        \
         spawn_weed: bool = False,
     ):
 
@@ -195,6 +196,9 @@ class StardewMineEnv(gym.Env):
         else:
             tile_type = self._get_tile_type()
 
+        # Check if ladder is visible in local view
+        ladder_visible = self._is_ladder_visible()
+
         reward = compute_reward(
             tile_type=tile_type,
             action=self._action_name(action),
@@ -203,6 +207,7 @@ class StardewMineEnv(gym.Env):
             current_energy=self.energy,
             previous_floor=prev_floor,
             current_floor=self.floor,
+            ladder_visible=ladder_visible,
             include_weeds=self.SPAWN_WEED,
         )
 
@@ -358,6 +363,19 @@ class StardewMineEnv(gym.Env):
             return self._map_tile_int_to_str(tile)
         return "unknown"
 
+    def _is_ladder_visible(self):
+        if self._ladder_location is None:
+            return False
+        
+        lx, ly = self._ladder_location
+        ax, ay = int(self.agent_location[0]), int(self.agent_location[1])
+        
+        half = self.LOCAL_VIEW_SIZE // 2
+        # Check if ladder is within local view range
+        if abs(lx - ax) <= half and abs(ly - ay) <= half:
+            return True
+        return False
+
 
     def _action_name(self, action):
         if action == self.ACTION_DESCEND:
@@ -417,18 +435,3 @@ class StardewMineEnv(gym.Env):
         g[y, x] = self.AGENT
         print("Floor:", self.floor, "Energy:", self.energy)
         print(g)
-
-
-# Backwards-compatible wrapper classes
-class StardewMineEnv_NoWeeds(StardewMineEnv):
-    def __init__(self, *args, **kwargs):
-        kwargs.setdefault('spawn_weed', False)
-        super().__init__(*args, **kwargs)
-
-
-class StardewMineEnv_Weeds(StardewMineEnv):
-    def __init__(self, *args, **kwargs):
-        kwargs.setdefault('spawn_weed', True)
-        # ensure WEED attribute exists for internal code that references it
-        self.WEED = 4
-        super().__init__(*args, **kwargs)
