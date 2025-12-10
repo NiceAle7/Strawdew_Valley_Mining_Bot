@@ -1,115 +1,115 @@
-"""Configurable reward function for the mining environment.
+# reward_functions.py
 
-Top-level constants are defined so training experiments can quickly
-adjust incentives by editing these values programmatically.
-"""
-
-# --- Tunable constants (edit between runs) -------------------------------
-# Primary rewards
+# Generic ore reward value
 ORE_REWARD_VALUES = {
-    "copper": 10.0,
-    "iron": 20.0,
-    "gold": 40.0,
-    "magma": 60.0,
-    "mystic_stone": 100.0,
-}
-ROCK_REWARD = 5.0
-WEED_PENALTY = 0.5
+    "copper": 5.0,
+    "iron": 8.0,
+    "gold": 12.0,
+    "magma": 15.0,
+    "mystic_stone": 25.0,
+}   # adjust during experiments
 
-# Mining action bonuses/penalties
-MINE_SUCCESS_BONUS = 30.0
-MINE_FAILURE_PENALTY = -20.0
-MINE_ATTEMPT_BONUS = 0.01
-
-# Exploration shaping
-NEW_TILE_BONUS = 2.0
-REVISIT_PENALTY = -0.5
-
-# Energy shaping (multiplier applied to energy delta)
-ENERGY_MULTIPLIER = 0.05
-
-# Progress
-DESCEND_BONUS = 20.0
-DESCEND_ATTEMPT_BONUS = 1.0
-DESCEND_FAILURE_PENALTY = -1.0
-LADDER_REACH_BONUS = 20.0
-LADDER_VISIBLE_BONUS = 2.0
-DESCEND_VISIBLE_ATTEMPT_BONUS = 10.0  # extra incentive to press descend when ladder is visible
-# -------------------------------------------------------------------------
-
-
-def compute_reward(tile_type: str, action: str, has_visited_before: bool,
-                   previous_energy: int, current_energy: int,
-                   previous_floor: int, current_floor: int,
-                   ladder_visible: bool = False,
-                   include_weeds: bool = True) -> float:
-    """Reward shaping tuned toward encouraging mining behavior.
-
-    Important: object rewards (ORE/ROCK) are only applied when the agent
-    actually takes the `mine` action. This prevents repeatedly collecting
-    the ore reward by standing on top of an ore tile.
+def ore_reward(tile_type, action):
     """
+    Reward for mining actual ore.
+    """
+    if action == "mine":
+        if tile_type in ORE_REWARD_VALUES:
+            return ORE_REWARD_VALUES[tile_type]
+    return 0.0
 
+
+def exploration_reward(has_visited_before):
+    """
+    Encourage exploring new tiles.
+    This should be small to avoid overpowering ore rewards.
+    """
+    return 0.15 if not has_visited_before else -0.01
+
+
+def movement_reward(action, has_visited_before):
+    """
+    Small reward for meaningful movement.
+    Keep this tiny because exploration_reward already handles novelty.
+    """
+    if action == "move":
+        return 0.03 if not has_visited_before else 0.0
+    return 0.0
+
+
+# def energy_shaping(previous_energy, current_energy):
+#     """
+#     Penalize wasting energy.
+#     """
+#     if current_energy < previous_energy:
+#         return -0.005
+#     return 0.0
+
+
+def useless_action_penalty(action, tile_type):
+    """
+    Penalize mining nothing or junk.
+    """
+    if action == "mine":
+        if tile_type == "empty":
+            return -0.6
+        if tile_type == "weeds":
+            return -0.2
+        if tile_type == "ladder":
+            return -1.0  # never mine the ladder!
+        if tile_type == "rock":
+            # Very small penalty becuase mining rock is often needed to find ladder
+            return -0.02
+    return 0.0
+
+
+def floor_progression(current_floor, previous_floor):
+    """
+    Reward going deeper.
+    """
+    if current_floor > previous_floor:
+        base = 4.0
+        depth_bonus = 0.5 * current_floor  # deeper floor -> slightly more
+        return base + depth_bonus
+    return 0.0
+
+
+def compute_reward(
+    tile_type,
+    action,
+    has_visited_before,
+    previous_energy,
+    current_energy,
+    previous_floor,
+    current_floor,
+    include_weeds=False
+):
+    """Combine all reward components."""
     reward = 0.0
 
-    # Mining action incentives and object rewards only when mining
-    try:
-        if action == "mine":
-            # small encouragement to try mining (bounded)
-            reward += MINE_ATTEMPT_BONUS
+    reward += ore_reward(tile_type, action)
 
-            # Reward specific ore types
-            if tile_type in ORE_REWARD_VALUES:
-                reward += ORE_REWARD_VALUES[tile_type] + MINE_SUCCESS_BONUS
-            elif tile_type == "rock":
-                reward += ROCK_REWARD + MINE_FAILURE_PENALTY
-            elif tile_type == "weeds":
-                reward -= WEED_PENALTY if include_weeds else 0.0
+    reward += exploration_reward(has_visited_before)
+    reward += movement_reward(action, has_visited_before)
+    # reward += energy_shaping(previous_energy, current_energy)
+    reward += useless_action_penalty(action, tile_type)
+    reward += floor_progression(current_floor, previous_floor)
+
+    # reward for clearing weeds
+    if include_weeds and action == "mine" and tile_type == "weeds":
+        reward += 0.1
+
+    return reward
+
+
+def update_ores_collected(tile_type, action, ores_collected):
+    """
+    Track ore count for evaluation.
+    """
+    if action == "mine":
+        if tile_type in ORE_REWARD_VALUES:
+            if isinstance(ores_collected, dict):
+                ores_collected[tile_type] = ores_collected.get(tile_type, 0) + 1
             else:
-                reward += MINE_FAILURE_PENALTY
-    except Exception:
-        pass
-
-    # Exploration / revisit shaping
-    if has_visited_before:
-        reward += REVISIT_PENALTY
-    else:
-        reward += NEW_TILE_BONUS
-
-    # Energy penalty
-    try:
-        reward += (current_energy - previous_energy) * ENERGY_MULTIPLIER
-    except Exception:
-        pass
-
-    # Dense shaping: small reward when ladder is visible in local view
-    try:
-        if ladder_visible:
-            reward += LADDER_VISIBLE_BONUS
-    except Exception:
-        pass
-
-    # Descend / ladder incentives
-    # If the agent chose the `descend` action, give a small attempt bonus.
-    # If the descend actually succeeded (floor increased) give a larger bonus.
-    # If it failed (no ladder at agent location), give a small penalty to discourage blind spamming.
-    try:
-        if action == "descend":
-            reward += DESCEND_ATTEMPT_BONUS
-            # if ladder is visible, give a stronger nudge to try descend
-            if ladder_visible:
-                reward += DESCEND_VISIBLE_ATTEMPT_BONUS
-            if current_floor > previous_floor:
-                reward += DESCEND_BONUS
-            else:
-                reward += DESCEND_FAILURE_PENALTY
-    except Exception:
-        pass
-    # Reward for moving onto the ladder tile (one-off per first visit)
-    try:
-        if action == "move" and tile_type == "ladder" and not has_visited_before:
-            reward += LADDER_REACH_BONUS
-    except Exception:
-        pass
-
-    return float(reward)
+                ores_collected += 1
+    return ores_collected
