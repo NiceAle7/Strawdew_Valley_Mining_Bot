@@ -1,0 +1,5 @@
+numpy
+gymnasium
+stable-baselines3
+stable-baselines3[extra]
+opencv-python
