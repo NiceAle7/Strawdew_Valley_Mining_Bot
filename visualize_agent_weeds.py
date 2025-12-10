@@ -26,7 +26,7 @@ except ImportError:
     print("Install OpenCV: pip install opencv-python")
 
 from stable_baselines3 import PPO
-from env.stardew_mine_env_weeds import StardewMineEnv
+from env.stardew_mine_env import StardewMineEnv
 
 
 # -------------------------------------------------------
@@ -34,13 +34,17 @@ from env.stardew_mine_env_weeds import StardewMineEnv
 # -------------------------------------------------------
 def tile_to_color(tile_type):
     colors = {
-        "empty":  (200, 200, 200),
-        "rock":   (100, 100, 100),
-        "ore":    (255, 200, 0),
-        "weeds":  (100, 200, 100),
-        "ladder": (150, 75, 0),
-        "agent":  (0, 100, 255),
-        "unknown": (50, 50, 50),
+        "empty":        (200, 200, 200),
+        "rock":         (100, 100, 100),
+        "copper":       (240, 115, 40),
+        "iron":         (142, 151, 151),
+        "gold":         (255, 180, 15),
+        "magma":        (235, 10, 10),
+        "mystic_stone": (245, 0, 245),
+        "weeds":        (100, 200, 100),
+        "ladder":       (150, 75, 0),
+        "agent":        (0, 100, 255),
+        "unknown":      (50, 50, 50),
     }
     return colors.get(tile_type, colors["unknown"])
 
@@ -119,7 +123,7 @@ def visualize_episodes(model_path, num_episodes=3, output_path="agent_demo.mp4",
 
         print(f"Episode {ep+1}/{num_episodes}", end=" ")
 
-        env = StardewMineEnv(size=size, seed=seed + ep)
+        env = StardewMineEnv(size=size, seed=seed + ep, spawn_weed=True)
         obs, info = env.reset()
 
         done = False
@@ -142,7 +146,9 @@ def visualize_episodes(model_path, num_episodes=3, output_path="agent_demo.mp4",
             else:
                 obs, reward, done, info = step_res
 
-            if info.get("last_mined_tile_type") == "ore":
+            # Track all ore types
+            ore_types = {"copper", "iron", "gold", "magma", "mystic_stone"}
+            if info.get("last_mined_tile_type") in ore_types:
                 episode_ores += 1
                 total_ores += 1
 

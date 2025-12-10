@@ -19,7 +19,7 @@ except ImportError:
     print("Install OpenCV: pip install opencv-python")
 
 from stable_baselines3 import PPO
-from env.stardew_mine_env_noweeds import StardewMineEnv
+from env.stardew_mine_env import StardewMineEnv
 
 
 # -------------------------------
@@ -27,13 +27,17 @@ from env.stardew_mine_env_noweeds import StardewMineEnv
 # -------------------------------
 def tile_to_color(tile_type):
     colors = {
-        "empty":  (200, 200, 200),
-        "rock":   (100, 100, 100),
-        "ore":    (255, 200, 0),
-        "weeds":  (100, 200, 100),
-        "ladder": (150, 75, 0),
-        "agent":  (0, 100, 255),
-        "unknown": (50, 50, 50),
+        "empty":        (200, 200, 200),
+        "rock":         (100, 100, 100),
+        "copper":       (240, 115, 40),
+        "iron":         (142, 151, 151),
+        "gold":         (255, 180, 15),
+        "magma":        (235, 10, 10),
+        "mystic_stone": (245, 0, 245),
+        "weeds":        (100, 200, 100),
+        "ladder":       (150, 75, 0),
+        "agent":        (0, 100, 255),
+        "unknown":      (50, 50, 50),
     }
     return colors.get(tile_type, colors["unknown"])
 
@@ -102,7 +106,7 @@ def visualize_episodes(model_path, num_episodes=3, output_path="agent_demo_no_we
         print(f"Episode {ep+1}/{num_episodes}", end=" ")
 
         # Create environment with no weeds
-        env = StardewMineEnv(size=size, seed=seed + ep)
+        env = StardewMineEnv(size=size, seed=seed + ep, spawn_weed=False)
         # Patch the floor generator to remove weeds
         env._generate_floor = lambda: _generate_floor_no_weeds(env)
         obs, info = env.reset()
@@ -125,7 +129,9 @@ def visualize_episodes(model_path, num_episodes=3, output_path="agent_demo_no_we
             else:
                 obs, reward, done, info = step_res
 
-            if info.get("last_mined_tile_type") == "ore":
+            # Track all ore types
+            ore_types = {"copper", "iron", "gold", "magma", "mystic_stone"}
+            if info.get("last_mined_tile_type") in ore_types:
                 episode_ores += 1
                 total_ores += 1
 
@@ -146,11 +152,17 @@ def visualize_episodes(model_path, num_episodes=3, output_path="agent_demo_no_we
 # FLOOR WITHOUT WEEDS
 # -------------------------------
 def _generate_floor_no_weeds(env):
-    """Generate a floor identical to env._generate_floor but without weeds."""
+    """Generate floor using multi-ore system without weeds."""
     env.grid = np.full((env.SIZE, env.SIZE), env.EMPTY, dtype=np.int32)
-    prob_rock, prob_ore = 0.25, 0.15
+    probs = env._get_floor_spawn_probs(env.floor)
+    p_rock   = probs["rock"]
+    p_copper = probs["copper"]
+    p_iron   = probs["iron"]
+    p_gold   = probs["gold"]
+    p_magma  = probs["magma"]
+    p_mystic = probs["mystic"]
+    
     possible = []
-
     ax, ay = int(env.agent_location[0]), int(env.agent_location[1])
 
     for y in range(env.SIZE):
@@ -159,20 +171,35 @@ def _generate_floor_no_weeds(env):
                 continue
 
             r = env.np_random.random()
-            if r < prob_rock:
+            
+            # Generate tiles using cumulative probabilities
+            if r < p_rock:
                 env.grid[y, x] = env.ROCK
                 possible.append((x, y))
-            elif r < prob_rock + prob_ore:
-                env.grid[y, x] = env.ORE
+            elif r < p_rock + p_copper:
+                env.grid[y, x] = env.COPPER
+                possible.append((x, y))
+            elif r < p_rock + p_copper + p_iron:
+                env.grid[y, x] = env.IRON
+                possible.append((x, y))
+            elif r < p_rock + p_copper + p_iron + p_gold:
+                env.grid[y, x] = env.GOLD
+                possible.append((x, y))
+            elif r < p_rock + p_copper + p_iron + p_gold + p_magma:
+                env.grid[y, x] = env.MAGMA
+                possible.append((x, y))
+            elif r < p_rock + p_copper + p_iron + p_gold + p_magma + p_mystic:
+                env.grid[y, x] = env.MYSTIC
                 possible.append((x, y))
 
     if not possible:
         x = int(env.np_random.integers(0, env.SIZE))
         y = int(env.np_random.integers(0, env.SIZE))
-        env.grid[y, x] = env.ROCK
-        possible.append((x, y))
+        if (x, y) != (ax, ay):
+            env.grid[y, x] = env.ROCK
+            possible.append((x, y))
 
-    if env.floor < env.MAX_FLOOR - 1:
+    if env.floor < env.MAX_FLOOR - 1 and possible:
         lx, ly = possible[int(env.np_random.integers(0, len(possible)))]
         env._ladder_location = (lx, ly)
         env.grid[ly, lx] = env.LADDER
