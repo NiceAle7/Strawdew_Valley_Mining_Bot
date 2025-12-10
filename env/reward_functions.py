@@ -7,23 +7,23 @@ adjust incentives by editing these values programmatically.
 # --- Tunable constants (edit between runs) -------------------------------
 # Primary rewards
 ORE_REWARD_VALUES = {
-    "copper": 5.0,
-    "iron": 10.0,
-    "gold": 20.0,
-    "magma": 30.0,
-    "mystic_stone": 50.0,
+    "copper": 10.0,
+    "iron": 20.0,
+    "gold": 40.0,
+    "magma": 60.0,
+    "mystic_stone": 100.0,
 }
-ROCK_REWARD = 1.0
+ROCK_REWARD = 5.0
 WEED_PENALTY = 0.5
 
 # Mining action bonuses/penalties
 MINE_SUCCESS_BONUS = 30.0
-MINE_FAILURE_PENALTY = -0.1
-MINE_ATTEMPT_BONUS = 1.0
+MINE_FAILURE_PENALTY = -20.0
+MINE_ATTEMPT_BONUS = 0.01
 
 # Exploration shaping
-NEW_TILE_BONUS = 0.2
-REVISIT_PENALTY = -0.2
+NEW_TILE_BONUS = 2.0
+REVISIT_PENALTY = -0.5
 
 # Energy shaping (multiplier applied to energy delta)
 ENERGY_MULTIPLIER = 0.05

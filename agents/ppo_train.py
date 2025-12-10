@@ -50,7 +50,7 @@ def main(spawn_weed=False):
         seed=0,
     )
 
-    total_timesteps = 400_000
+    total_timesteps = 100_000
     model.learn(total_timesteps=total_timesteps)
 
     # Determine save path and filename
