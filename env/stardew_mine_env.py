@@ -59,6 +59,8 @@ class StardewMineEnv(gym.Env):
         else:
             self.MAX_TILE_TYPE = 7
         self.AGENT = 9
+        self.MAGMA_GEODE = self.MAGMA
+        self.MYSTIC_STONE = self.MYSTIC
 
         # Actions
         self.action_space = gym.spaces.Discrete(17)
